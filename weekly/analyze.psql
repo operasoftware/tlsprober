@@ -1,0 +1,8 @@
+analyze "resultdb2_resultsummarylist_DomainEntries0";
+analyze "probedata2_serverdomain";
+analyze resultdb2_resultsummarylist_summaries;
+analyze "resultdb2_resultentry_IPDomainSummary0";
+analyze "resultdb2_resultentry_DomainSummary0";
+analyze "resultdb2_resultentry_SecondaryServerAgentSummary";
+analyze "resultdb2_resultentry_SecondaryShortServerAgentSummary";
+analyze "resultdb2_resultentry";

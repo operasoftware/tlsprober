@@ -1,0 +1,47 @@
+# Recommended changes to the database indexing after creation, to increase performance.
+
+# Must be performed in a SQL command line interface, psql for PostgreSQL 
+
+### probedata2_probequeue and cluster_clusteraction id fields
+### will eventually exhaust a 32 bit signed integer
+### convert to bigint to avoid the issue
+### Consider also doing this for:
+###     probedata2_commonservergroup_server_aliases.id
+###     resultdb2_resultentry_IPDomainSummary0.id
+###     resultdb2_resultentry_DomainSummary0.id
+###     probedata2_proberesult_certificates.id
+begin;
+DROP VIEW probedata2_probequeue_next_job;
+alter table probedata2_probequeue
+  alter column id type bigint;
+commit;
+begin;
+Create or replace view probedata2_probequeue_next_job AS
+ SELECT probedata2_probequeue.id, probedata2_probequeue.part_of_run_id
+   FROM probedata2_probequeue
+  WHERE probedata2_probequeue.state::text = 'I'::text;
+commit;
+begin;
+alter table cluster_clusteraction
+  alter column id type bigint;
+commit;
+### End type change
+
+CREATE INDEX "probedata2_probequeue_run_idle" ON "probedata2_probequeue" ("part_of_run_id") WHERE ("probedata2_probequeue"."state" = E'I');
+CREATE INDEX "probedata2_probequeue_finished" ON "probedata2_probequeue" ("id") WHERE ("probedata2_probequeue"."state" = E'F');
+
+
+CREATE INDEX "cluster_clusteraction_run_completed_time" ON "cluster_clusteraction" ("cluster_run_id", "completed_time");
+
+CREATE INDEX "probedata2_serveripprobed_run_server" ON "probedata2_serveripprobed" ("part_of_run_id", "server_id");
+
+drop index certs_certattributes_subject_oneline;
+drop index certs_certattributes_issuer_oneline ;
+CREATE INDEX "certs_certattributes_subject_oneline" ON "certs_certattributes" using hash ("subject_oneline");
+CREATE INDEX "certs_certattributes_issuer_oneline" ON "certs_certattributes" using hash ("issuer_oneline");
+
+CREATE INDEX "resultdb2_resultconditionset_result_summary_csid" ON 
+	"resultdb2_resultconditionset_result_summary" ("resultconditionset_id");
+
+CREATE INDEX "resultdb2_resultconditionset_result_summary_cid" ON 
+	"resultdb2_resultconditionset_result_summary" ("resultcondition_id");

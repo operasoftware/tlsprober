@@ -1,0 +1,14 @@
+*.pyc
+*.pyo
+*.bak
+/results
+/db
+/work
+/.settings
+/public_html
+.#*
+_*
+*~
+*.so
+/.ip2country*
+

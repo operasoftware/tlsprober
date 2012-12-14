@@ -1,0 +1,5 @@
+
+MAILTO=yngve@opera.com
+#test run 
+@reboot		cd $HOME/src/tlsprober; cvs -q up -Pd; python cluster_start.py
+

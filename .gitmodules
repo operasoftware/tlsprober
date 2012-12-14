@@ -1,0 +1,6 @@
+[submodule "tlscommon"]
+	path = tlscommon
+	url = ../tlscommon.git
+[submodule "tlslite"]
+	path = tlslite
+	url = ../tlslite.git

@@ -1,0 +1,120 @@
+{% comment %}
+#   Copyright 2010-2012 Opera Software ASA 
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+{% endcomment %}
+
+{% extends "base.html" %}
+{% load tags	 %}
+
+{% block title %}TLSProber: List of probe summary results.
+{% endblock %}
+
+{% block title_doc %}TLSProber: List of probe summary results.
+{% endblock %}
+
+{% block content %}
+
+	<h2>Summary</h2>
+	<p>List of <a href="../search?run_to_use={{ summary_id }}&amp;profile={{ object.id }}&amp;summary=hosts_alexa">Servers</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;profile={{ object.id }}&amp;summary=shortprimaryagent">Primary Agent Family</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;profile={{ object.id }}&amp;summary=domains">Domains</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;profile={{ object.id }}&amp;summary=ipdomain">IP Domains</a>
+	</p>
+	<p>Basic profile: <a href="{{object.basic_result_id}}?run={{run}}">{{ object.basic_result.key }}</a>
+		List of <a href="../search?run_to_use={{ summary_id }}&amp;bprofile={{ object.basic_result_id }}&amp;summary=hosts_alexa">Servers</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;bprofile={{ object.basic_result_id }}&amp;summary=shortprimaryagent">Primary Agent Family</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;bprofile={{ object.basic_result_id }}&amp;summary=domains">Domains</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;bprofile={{ object.basic_result_id }}&amp;summary=ipdomain">IP Domains</a>
+	</p>
+	<p>Fundamental profile: <a href="{{object.fundamental_result_id}}?run={{run}}">{{ object.fundamental_result.key }}</a>
+		List of <a href="../search?run_to_use={{ summary_id }}&amp;fprofile={{ object.fundamental_result_id }}&amp;summary=hosts_alexa">Servers</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;fprofile={{ object.fundamental_result_id }}&amp;summary=shortprimaryagent">Primary Agent Family</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;fprofile={{ object.fundamental_result_id }}&amp;summary=domains">Domains</a>,
+		<a href="../search?run_to_use={{ summary_id }}&amp;fprofile={{ object.fundamental_result_id }}&amp;summary=ipdomain">IP Domains</a>
+	</p>
+	
+	<p></p>
+
+	
+	
+	{% if warn_details or trouble_details %}
+	{% for item in trouble_details %}
+	{%if forloop.first %}
+	<p>Serious:</p>
+	{%endif%}
+	<p style="color:red;">{{item}}</p>
+	{%endfor%}
+	{% for item in warn_details %}
+	{%if forloop.first %}
+	<p>Warnings:</p>
+	{%endif%}
+	<p style="color:orange;">{{item}}</p>
+	{%endfor%}
+	{%else%}
+	<p>No problems detected</p>
+	{%endif%}
+
+	<h2>Details</h2>
+	<p>Supported SSL/TLS versions</p>
+	<table>
+		{%if support_20 %}
+		<tr><td>SSL v2.0</td><td><span style="color:black; background-color:red;">Yes</span></td>
+		{%endif%}
+		<tr><td>SSL v3.0</td><td>{% color_value support_30 %}</td>
+		<tr><td>TLS 1.0</td><td>{% color_value support_31 %}</td>
+		<tr><td>TLS 1.1</td><td>{% color_value support_32 %}</td>
+		<tr><td>TLS 1.2</td><td>{% color_value support_33 %}</td>
+	</table>
+	<h2>Tolerance details:</h2>
+	<table>
+		<tr>
+			<th>Version</th>
+			<th>Version Tolerance</<th>
+			<th>Extension Tolerance</<th>
+			<th>Version checking</<th>
+			<th>Bad version requirement</<th>
+		</tr>
+
+	{% for entry in version_status %}
+		<tr>
+			<td>{{entry.version_name}} ({{entry.version.0}}.{{entry.version.1}})</td>
+			<td>{% color_value entry.version_intolerant %}</td>
+			<td>{% color_value entry.extension_intolerant %}</td>
+			<td>{% color_value entry.no_version_check %}</td>
+			<td>{% color_value entry.require_bad_version_check %}</td>
+		</tr>
+	{% endfor %}
+	</table>
+	{%ifnotequal object.fundamental_result_id object.id %}
+	<h2>Support for SSL/TLS cipher suites tested:</h2>
+	<table>
+	{% for cipher, ciphersupported in supported_ciphers.items|dictsort:"0" %}
+		<tr>
+			<td>{{cipher}} </td>
+			<td>{% color_value ciphersupported %}</td>
+		</tr>
+	{% endfor %}
+	</table>
+	{%endifnotequal%}
+	<h2>Condition details</h2>
+	{% for entry in conditions %}
+		<p>{{entry}}</p>
+	{% endfor %}
+	
+
+{% for content in debug_output %}
+<hr></hr>
+<p>{{ content|escape }}</p> 
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,227 @@
+#   Copyright 2010-2012 Opera Software ASA 
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+**** Checkout and start instructions ****
+
+  git clone --recursive gitserver:/git/tlsprober.git
+  
+  cd tlsprober/
+  
+  DBserver: 
+
+  #Update email and host data in config.py   
+  cd proberdb
+  #Configure database in settings.py
+  cd ..
+  git commit config.py proberdb/settings.py 
+  git push <to your own repository>
+  python manage.py syncdb
+  # Consider running the recommended changes listed in 
+  # TODO/extrasql.txt . These changes can be added later.
+  
+  cd ../weekly
+  bash setup_weekly.sh
+  #this configures a weekly job using the "Weekly Run" preconfigured queue
+  
+  Nodes:
+  
+  git clone --recursive <your repository>:/git/tlsprober.git
+  
+  cd tlsprober/weekly
+  bash setup_node.sh
+  
+
+Starting a run:
+
+  PWD: tlsprober
+
+  <Create a CSV list of servers [hostname, port (default 443), protocol (default HTTPS)]>
+  
+  python special_run.py --input list.csv --source my_project --description "Test run of TLS Prober" --verbose
+  
+Alternatively, create a preconfigured list
+
+  python queue_setup  --input list.csv --name "my list" --description "My list of servers for a TLS Prober run" --verbose
+  
+  python special_run.py --queue "my list" --source my_project --description "Test run of TLS Prober" --verbose
+
+use
+
+  python cluster_monitor 
+  
+to monitor progress
+
+
+**** Introduction **** 
+
+The tlsprober consists of
+
+  - a batch test utility that uses the tlscommon.probe_server.ProbeServer class
+  to perform tests of many servers. A group of results are generated as HTML files.
+  - a batch scan utility that can
+  - a web-based result query system for analyzing results
+  - some ad-hoc examples of scripts to analyze the results.
+  - a database where results are registered 
+
+Setting up a tlsprober as a cluster consisting of a database server and one 
+or more nodes is described in weekly/README. 
+
+**** Managing nodes ****
+
+Each node registers automatically in the cluster node table with the hostname
+and a default configuration of "--processes 40 --iterations 40", meaning that
+the node will run 40 processes at a time, each performing 40 probes before
+shutting down, causing a new process to be spun up (This is done to limit the
+damage potential of eventual memory leaks). 
+
+Using the Django http://server/admin UI (server should be localhost) the 
+activity of the cluster can be adjusted. These tables can be used to disable 
+the entire cluster, or individual nodes, and individual batch jobs. Individual
+tables exists for ClusterNodes, ClusterRuns and ScannerNodes.    
+
+The configuration setting should be tweaked to fit the database configuration 
+and hardware used. For example, Opera's cluster nodes are configured with 
+"--processes 600 --iterations 1000".
+
+
+**** Starting a prober job: ****
+
+  PWD: tlsprober
+
+  <Create a CSV list of servers [hostname, port (default 443), protocol (default HTTPS)]>
+  
+  python special_run.py --input list.csv --source my_project --description "Test run of TLS Prober" --verbose
+  
+Alternatively, create a preconfigured list
+
+  python queue_setup  --input list.csv --name "my list" --description "My list of servers for a TLS Prober run" --verbose
+  
+  python special_run.py --queue "my list" --source my_project --description "Test run of TLS Prober" --verbose
+
+An out of sync weekly run can be started using the weekly_run.py script, 
+which can also be used to restart a stopped job
+
+Both weekly_run.py and special_run.py will wait for the job to finish, 
+and will then generate a set of commonly used result summaries 
+
+**** Webserver ****
+
+
+The tlsprober is based on the Django framework (only tested in Django 1.1), 
+and the web part is deployed on a HTTP server using the standard Django 
+deployment procedures described at 
+
+  <https://docs.djangoproject.com/en/1.1/howto/deployment/>
+  
+using tlsprober.proberdb.settings as the settings module.
+
+In the deployed path, the following URLs are defined
+
+  /     	:	Main query page. 
+  /get		:	Query page that produces GET query URL that can be sent as links in emails
+  /search	:	Query result generator
+  /showprofile/ : Presents information about common profiles
+  /admin 	:	Django Admin site. Should only be enabled when necessary, usually localhost. 
+  
+There are other paths, but those have not been maintained, and may not work, and have therefore been disabled.
+
+
+**** Requirements ****
+
+ - Python 2.6 or later
+ - Django 1.1 or later (Only tested with 1.1)
+ - OpenSSL 0.9.8+
+ - M2Crypto 
+ - A databaseserver, with relevant drivers for Django
+ - A webserver, Can be run on either the DB server or another machine
+ 
+ 
+Suggestions for the database server
+
+  The system Opera have use for the prober consists of
+    - One database server with 16 cores and 96GB RAM
+    - 2 prober nodes with 16 cores and 24GB RAM, running 600 processes each  
+    - A PostgreSQL 9.0 database
+    
+  The capability of the database server needs to be scaled to the number of 
+  processes used when probing; too many processes and the database server will
+  end up locked in a high load situation. 
+  
+  PostgreSQL settings used by Opera:
+  
+     shared_buffers = 10000MB
+     work_mem = 5MB
+     max_files_per_process = 1000
+     effective_io_concurrency = 325
+     synchronous_commit = off # problematic if power fails
+     full_page_writes = off
+     effective_cache_size = 50000MB
+     autovacuum = off 
+     autovacuum_freeze_max_age = 500000000
+     
+   The Autovacuum settings are set that way as the vacuuming interferes with
+   the effectiveness of the database, particularly the automatic analyze
+   scripts, which results in dramatic performances slowdowns.
+   
+   A full vacuum and analyze should be performed weekly, or between major
+   prober-runs. 
+   
+   Additionally, before the weekly vacuum the number of items in the queue 
+   and action tables should be reduced, as too many items from completed runs
+   tend to reduce performance:
+   
+      delete from cluster_clusteraction where cluster_run_id < (select max(id) from cluster_clusterrun) -4;
+      delete from probedata2_probequeue where part_of_run_id < (select max(id) from probedata2_proberun) -4;
+      
+**** Database ****
+
+The database is used to organize the list of servers, the task queue, activity
+information, and the results.
+
+The most important database tables are:
+
+* probedb.cluster.models.ClusterNode: The entries for the nodes, including their 
+  configuration. Update entries of this table in the Django admin UI to adjust 
+  the configuration and enable/disable nodes. A special entry enables/disables 
+  the entire cluster  
+
+* probedb.probedata2.proberun.ProbeRun : The list of all jobs
+
+* probedb.cluster.models.ClusterRun: The job list for the cluster, linked to ProbeRun
+
+* probedb.probedata2.models.Server: List of all servers (name, port, protocol) and 
+  whether they are enabled, or not.
+  
+* probedb.resultdb2.summary_models.ResultSummaryList: Top node for results for a given run, 
+  links to the fundamental resources, and the results. APIs in this class is used for 
+  result queries.  
+
+* probedb.resultdb2.models.ResultEntry: Registers information about each ProbeResult
+  that is registered just for the run itself, not globally, making database searches
+  easier.
+
+* probedb.probedata2.models.ProbeResult: Node for each result, without the more
+  specific analyze possible using ResultEntry. Links to a unique profile for 
+  each encountered result combination, as well as information that may be 
+  unrelated to the result combination.
+
+**** NOTES ****
+
+ - Some parts of the code uses direct SQL for performance reasons. 
+ Example: IP address lookups are made using INET to convert the 
+ IPaddress to the internal representation, as this was not done normally.
+ 
+ - Only IPv4 addresses have been used. IPv6 has not been tested.
+ 
+  
